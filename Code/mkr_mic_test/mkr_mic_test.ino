@@ -9,8 +9,8 @@ const long SERIAL_BAUD = 115200;
 const uint16_t WINDOW_MS = 40;
 
 void setup() {
-  Serial.begin(SERIAL_BAUD);
-  delay(1200);
+ Serial.begin(115200);
+ while (!Serial);
 
   pinMode(MIC_AO_PIN, INPUT);
   pinMode(MIC_DO_PIN, INPUT);
