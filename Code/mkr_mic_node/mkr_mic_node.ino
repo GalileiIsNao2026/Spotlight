@@ -4,10 +4,15 @@
 // --- Modalita alimentazione ---
 const bool BATTERY_MODE = true;
 
-// --- Connessione al R4 (AP) ---
-const char SSID[] = "PALCO_R4_BASE";
-const char PASS[] = "palco12345";
-IPAddress r4Ip(192, 168, 4, 1); // IP default AP Arduino
+// --- Connessione al Modem ---
+const char SSID[] = "Galileiisnao";
+const char PASS[] = "SebastianoMagnano"; 
+
+// !!! IMPORTANTE !!! 
+// Sostituisci questo IP con quello che il modem assegna al tuo Arduino R4.
+// Lo puoi leggere sul Monitor Seriale dell'R4 all'avvio.
+IPAddress r4Ip(192, 168, 1 ,188); 
+
 const uint16_t UDP_PORT = 4210;
 
 // --- Microfono KY-038 ---
@@ -58,14 +63,12 @@ uint16_t readEnvelopeP2P() {
 
   uint16_t raw = signalMax - signalMin;
 
-  // Traccia lenta del rumore di fondo per auto-calibrazione.
   noiseFloor += 0.03f * ((float)raw - noiseFloor);
   noiseFloor = constrain(noiseFloor, 0.2f, 120.0f);
 
   float gate = noiseFloor + BASE_GATE;
   float envelope = (raw > gate) ? ((float)raw - gate) : 0.0f;
 
-  // Auto-gain: mantiene dinamica visibile anche con segnali deboli.
   envTracker *= 0.985f;
   if (envelope > envTracker) envTracker = envelope;
   envTracker = constrain(envTracker, 12.0f, 700.0f);
@@ -81,7 +84,6 @@ uint16_t readEnvelopeP2P() {
 AudioFeatures extractFeatures(uint16_t env) {
   float x = (float)env;
 
-  // Costanti di smoothing: fast/mid/slow
   envFast += 0.50f * (x - envFast);
   envMid += 0.20f * (x - envMid);
   envSlow += 0.05f * (x - envSlow);
@@ -104,9 +106,9 @@ AudioFeatures extractFeatures(uint16_t env) {
   return f;
 }
 
-void connectToR4() {
+void connectToModem() {
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print("Connessione a ");
+    Serial.print("Connessione a: ");
     Serial.println(SSID);
     WiFi.begin(SSID, PASS);
 
@@ -121,7 +123,7 @@ void connectToR4() {
     Serial.println();
   }
 
-  Serial.println("Connesso al R4");
+  Serial.println("Connesso al Modem!");
   Serial.print("IP MKR: ");
   Serial.println(WiFi.localIP());
 }
@@ -140,7 +142,7 @@ void setup() {
     }
   }
 
-  connectToR4();
+  connectToModem();
   udp.begin(UDP_PORT);
 
   if (BATTERY_MODE) {
@@ -155,7 +157,6 @@ void setup() {
 }
 
 void sendFeatures(const AudioFeatures &f) {
-  // Formato CSV: overall,low,mid,high,peak
   char payload[40];
   snprintf(
     payload,
@@ -175,7 +176,7 @@ void sendFeatures(const AudioFeatures &f) {
 
 void loop() {
   if (WiFi.status() != WL_CONNECTED) {
-    connectToR4();
+    connectToModem();
   }
 
   if (millis() - lastSendMs >= SEND_INTERVAL_MS) {

@@ -2,9 +2,9 @@
 #include <WiFiUdp.h>
 #include <FastLED.h>
 
-// --- WiFi AP del palco (R4) ---
-const char AP_SSID[] = "PALCO_R4_BASE";
-const char AP_PASS[] = "palco12345";
+// --- Configurazione Wi-Fi del Modem ---
+const char SSID[] = "Galileiisnao";
+const char PASS[] = "SebastianoMagnano";
 const uint16_t UDP_PORT = 4210;
 
 // --- Pin Sensore e Relè ---
@@ -34,6 +34,14 @@ uint8_t smoothedHue = 100;
 void setup() {
   Serial.begin(115200);
   
+  // Questa riga ferma l'R4 finché non apri il Monitor Seriale sul PC.
+  // In questo modo sei sicuro al 100% di non perderti i messaggi di avvio.
+  while (!Serial) { 
+    ; 
+  }
+  
+  Serial.println("\n--- AVVIO SISTEMA ARDUINO R4 ---");
+  
   // Configurazione Pin
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -44,12 +52,27 @@ void setup() {
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.clear(true);
 
-  if (WiFi.beginAP(AP_SSID, AP_PASS) != WL_AP_LISTENING) {
-    Serial.println("Errore AP");
-    while (true);
+  // --- Connessione alla rete Wi-Fi del Modem ---
+  Serial.print("Connessione a: ");
+  Serial.println(SSID);
+  
+  int status = WL_IDLE_STATUS;
+  while (status != WL_CONNECTED) {
+    status = WiFi.begin(SSID, PASS);
+    Serial.print(".");
+    delay(1000);
   }
 
+  // --- STAMPA DELL'IP IN SERIALE ---
+  Serial.println("\n=================================");
+  Serial.println(" CONNESSO CORRETTAMENTE AL WI-FI!");
+  Serial.print(" INDIRIZZO IP ASSEGNATO ALL'R4: ");
+  Serial.println(WiFi.localIP()); // <-- Questa è la funzione che legge e manda l'IP in seriale
+  Serial.println("=================================\n");
+
+  // Avvio del servizio UDP
   udp.begin(UDP_PORT);
+  Serial.println("In ascolto sulla porta UDP: " + String(UDP_PORT));
   Serial.println("Sistema Pronto. In attesa di oggetto...");
 }
 
@@ -95,7 +118,6 @@ uint8_t pickHueFromBands(uint16_t low, uint16_t mid, uint16_t high) {
 }
 
 void showAudioOnStrip(uint16_t overall, uint16_t low, uint16_t mid, uint16_t high, uint8_t peak) {
-  // Se il sistema non è attivato, i LED restano spenti
   if (!sistemaAttivato) {
     FastLED.clear(true);
     return;
@@ -113,7 +135,6 @@ void showAudioOnStrip(uint16_t overall, uint16_t low, uint16_t mid, uint16_t hig
       leds[0] = CHSV(hue, 255, bright);
       leds[1] = CHSV(hue, 255, bright);
       leds[2] = CHSV(hue, 255, bright);
-
     } else {
       leds[0].fadeToBlackBy(80);
       leds[1].fadeToBlackBy(80);
@@ -130,7 +151,7 @@ void loop() {
     if (dist > 0 && dist < distanzaSoglia) {
       sistemaAttivato = true;
       digitalWrite(relePin, HIGH); // Accendi relè per sempre
-      Serial.println("ATTIVATO!");
+      Serial.println("SISTEMA SBLOCCATO E ATTIVATO!");
     }
   }
 
