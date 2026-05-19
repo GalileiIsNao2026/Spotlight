@@ -13,8 +13,8 @@ const int echoPin = 4;
 const int relePin = 5;
 const int distanzaSoglia = 20; // Soglia in cm
 
-// FORZATO A TRUE PER IL TEST: così escludiamo problemi al sensore di distanza
-bool sistemaAttivato = true; 
+// Variabile di stato per bloccare il sistema in "ACCESO"
+bool sistemaAttivato = false; 
 
 // --- LED strip ---
 const uint8_t LED_PIN = 7;
@@ -32,20 +32,23 @@ const unsigned long SIGNAL_TIMEOUT_MS = 1200;
 uint8_t smoothedHue = 100;
 
 void setup() {
+  // Ritardo iniziale per stabilizzare la USB al boot
   delay(3000); 
   Serial.begin(115200);
   
-  Serial.println("\n--- AVVIO ARDUINO R4 (DEBUG MOD) ---");
+  Serial.println("\n--- AVVIO ARDUINO R4 ---");
   
+  // Configurazione Pin
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
   pinMode(relePin, OUTPUT);
-  digitalWrite(relePin, HIGH); // Forziamo il relè acceso per il test
+  digitalWrite(relePin, LOW); 
 
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.clear(true);
 
+  // Connessione al Router
   Serial.print("Connessione a: ");
   Serial.println(SSID);
   
@@ -56,16 +59,18 @@ void setup() {
     delay(1000);
   }
 
+  // --- STAMPA DEGLI INDIRIZZI IP IN SERIALE ---
   Serial.println("\n=========================================");
   Serial.println(" CONNESSO CORRETTAMENTE AL ROUTER!");
   Serial.print(" IP DEL TUO ROUTER (GATEWAY): ");
-  Serial.println(WiFi.gatewayIP()); 
+  Serial.println(WiFi.gatewayIP()); // <-- Mostra l'IP del Router
   Serial.print(" IP ASSEGNATO A QUESTO ARDUINO R4: ");
-  Serial.println(WiFi.localIP());   
+  Serial.println(WiFi.localIP());   // <-- Questo è l'IP da copiare nell'MKR!
   Serial.println("=========================================\n");
 
+  // Avvio UDP
   udp.begin(UDP_PORT);
-  Serial.println("In ascolto sulla porta UDP: " + String(UDP_PORT));
+  Serial.println("Sistema Pronto. In attesa di sblocco tramite sensore...");
 }
 
 long readDistance() {
@@ -87,11 +92,6 @@ void readUdpFeatures() {
   int len = udp.read(incoming, sizeof(incoming) - 1);
   if (len < 0) return;
   incoming[len] = '\0';
-
-  // --- RIGA DI DEBUG AGGIUNTA ---
-  // Stampa sul monitor seriale la stringa esatta che arriva dall'MKR
-  Serial.print("DATO RICEVUTO UDP: ");
-  Serial.println(incoming);
 
   int o, l, m, h, p;
   if (sscanf(incoming, "%d,%d,%d,%d,%d", &o, &l, &m, &h, &p) == 5) {
@@ -141,7 +141,15 @@ void showAudioOnStrip(uint16_t overall, uint16_t low, uint16_t mid, uint16_t hig
 }
 
 void loop() {
-  // Lettura dati UDP continuo
+  if (!sistemaAttivato) {
+    long dist = readDistance();
+    if (dist > 0 && dist < distanzaSoglia) {
+      sistemaAttivato = true;
+      digitalWrite(relePin, HIGH); 
+      Serial.println("SISTEMA ATTIVATO E SBLOCCATO!");
+    }
+  }
+
   readUdpFeatures();
 
   bool signalAlive = (millis() - lastPacketMs) < SIGNAL_TIMEOUT_MS;
